@@ -1,0 +1,293 @@
+﻿Program.Sub.ScreenSU.Start
+Gui.fmMain..Create(BaseForm)
+Gui.fmMain..Caption("Updated Reorder Points")
+Gui.fmMain..Size(16590,8190)
+Gui.fmMain..MinX(0)
+Gui.fmMain..MinY(0)
+Gui.fmMain..Position(0,0)
+Gui.fmMain..BackColor(-2147483633)
+Gui.fmMain..MousePointer(0)
+Gui.fmMain..Event(UnLoad,fmMain_UnLoad)
+Gui.fmMain..AlwaysOnTop(False)
+Gui.fmMain..FontName("Tahoma")
+Gui.fmMain..FontSize(8.25)
+Gui.fmMain..ControlBox(True)
+Gui.fmMain..MaxButton(True)
+Gui.fmMain..MinButton(True)
+Gui.fmMain..Moveable(True)
+Gui.fmMain..Sizeable(True)
+Gui.fmMain..ShowInTaskBar(True)
+Gui.fmMain..TitleBar(True)
+Gui.fmMain.GsGcUpdated.Create(GsGridControl)
+Gui.fmMain.GsGcUpdated.Size(16245,6690)
+Gui.fmMain.GsGcUpdated.Position(105,525)
+Gui.fmMain.GsGcUpdated.Anchor(15)
+Gui.fmMain.GsGcUpdated.Enabled(True)
+Gui.fmMain.GsGcUpdated.Visible(True)
+Gui.fmMain.GsGcUpdated.Zorder(0)
+Gui.fmMain.lblMsg.Create(Label,"The Reorder Point for the following part(s) has been updated:",True,5850,240,0,105,225,True,0,"Arial",10,-2147483633,0,0)
+Gui.fmMain.lblMsg.FontStyle(True,False,False,False,False)
+Gui.fmMain.lblMsg.BorderStyle(0)
+Gui.fmMain.cmdExport.Create(Button)
+Gui.fmMain.cmdExport.Size(1425,375)
+Gui.fmMain.cmdExport.Position(14925,7290)
+Gui.fmMain.cmdExport.Caption("Export")
+Gui.fmMain.cmdExport.FontSize(10)
+Gui.fmMain.cmdExport.FontStyle(True,False,False,False,False)
+Gui.fmMain.cmdExport.Event(Click,cmdExport_Click)
+Gui.fmMain.cmdExport.Anchor(10)
+Gui.fmMain.cmdExport.Enabled(True)
+Gui.fmMain.cmdExport.Visible(True)
+Gui.fmMain.cmdExport.Zorder(0)
+Gui.fmMain.cmdExport.FontName("Tahoma")
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+'TJS, July 2021
+'Customer: Specialty Roll Products
+'Quote: 24329
+'Business Case: The customer is looking for a systematic process to establish a reorder point by averaging the previous three months usage.
+'Solution:  A new menu item will be added to Inventory > Administration > Calculate Reorder Point [6423].  The project will calculate the previous three months average and update the reorder point based on this average.  If there is not data for the previous three months, resulting in a "0" average, the original reorder point will be used.
+'A gridview will popup reflecting the reorder points that have changed.  This gridview can be exported to Excel.
+V.Local.sMonth1.Declare
+V.Local.sMonth2.Declare
+V.Local.sMonth3.Declare
+V.Local.sDate.Declare
+V.Local.sSQL.Declare
+V.Local.iCnt.Declare
+V.Local.fValue.Declare
+V.Local.sMsg.Declare
+
+F.Intrinsic.String.Format(V.Ambient.Date,"MM",V.Local.sDate)
+
+F.Intrinsic.Control.SelectCase(V.Local.sDate)
+	F.Intrinsic.Control.Case("01")
+		V.Local.sDate.Set("13")
+		F.Intrinsic.Math.Sub(V.Local.sDate,1,V.Local.sMonth1)
+		F.Intrinsic.Math.Sub(V.Local.sDate,2,V.Local.sMonth2)
+		F.Intrinsic.Math.Sub(V.Local.sDate,3,V.Local.sMonth3)
+	F.Intrinsic.Control.Case("02")
+		V.Local.sDate.Set("14")
+		F.Intrinsic.Math.Sub(V.Local.sDate,13,V.Local.sMonth1)
+		F.Intrinsic.Math.Sub(V.Local.sDate,2,V.Local.sMonth2)
+		F.Intrinsic.Math.Sub(V.Local.sDate,3,V.Local.sMonth3)
+	F.Intrinsic.Control.CaseElse
+		F.Intrinsic.Math.Sub(V.Local.sDate,1,V.Local.sMonth1)
+		F.Intrinsic.Math.Sub(V.Local.sDate,2,V.Local.sMonth2)
+		F.Intrinsic.Math.Sub(V.Local.sDate,3,V.Local.sMonth3)
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.String.LPad(V.Local.sMonth1,"0",2,V.Local.sMonth1)
+F.Intrinsic.String.LPad(V.Local.sMonth2,"0",2,V.Local.sMonth2)
+F.Intrinsic.String.LPad(V.Local.sMonth3,"0",2,V.Local.sMonth3)
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+
+F.Intrinsic.String.Build("Select PART,LOCATION,QTY_REORDER as OLD_REORDER,QTY_USAGE_MO_{0} as MONTH1,QTY_USAGE_MO_{1} as MONTH2,QTY_USAGE_MO_{2} as MONTH3,IF(QTY_USAGE_MO_{0} = 0,0,1) as Div1,IF(QTY_USAGE_MO_{1} = 0,0,1) as Div2,IF(QTY_USAGE_MO_{2} = 0,0,1) as Div3 from INVENTORY_MSTR",V.Local.sMonth3,V.Local.sMonth2,V.Local.sMonth1,V.Local.sSQL)
+
+F.Data.DataTable.CreateFromSQL("dtInvUsage","conts",V.Local.sSQL)
+
+F.Data.DataTable.AddExpressionColumn("dtInvUsage","DIVISOR","Long","Div1+Div2+Div3")
+F.Data.DataTable.AddExpressionColumn("dtInvUsage","3MONTHAVG","Float","IIF(DIVISOR = 0,0.0000,(MONTH1+MONTH2+MONTH3)/DIVISOR)")
+
+F.Data.DataTable.AddColumn("dtInvUsage","NEW_REORDER_POINT","Float")
+F.Data.DataTable.AddColumn("dtInvUsage","CHANGED","Boolean",False)
+
+F.Intrinsic.Control.For(V.Local.iCnt,0,V.DataTable.dtInvUsage.RowCount--,1)
+	F.Intrinsic.Control.If(V.DataTable.dtInvUsage(V.Local.iCnt).3MONTHAVG!FieldVal,=,0)
+		V.Local.fValue.Set(V.DataTable.dtInvUsage(V.Local.iCnt).OLD_REORDER!FieldVal)
+		F.Intrinsic.Math.Round(V.Local.fValue,0,V.Local.fValue)
+		F.Data.DataTable.SetValue("dtInvUsage",V.Local.iCnt,"NEW_REORDER_POINT",V.Local.fValue)
+	F.Intrinsic.Control.Else
+		V.Local.fValue.Set(V.DataTable.dtInvUsage(V.Local.iCnt).3MONTHAVG!FieldVal)
+		F.Intrinsic.Math.Round(V.Local.fValue,0,V.Local.fValue)
+		F.Data.DataTable.SetValue("dtInvUsage",V.Local.iCnt,"NEW_REORDER_POINT",V.Local.fValue)
+		F.Data.DataTable.SetValue("dtInvUsage",V.Local.iCnt,"CHANGED",True)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Next(V.Local.iCnt)
+
+F.Data.DataView.Create("dtInvUsage","dvUpdated",22,"CHANGED = TRUE and NEW_REORDER_POINT+'.0000' <> OLD_REORDER","")
+
+F.Data.DataView.ToDataTable("dtInvUsage","dvUpdated","dtUpdate",True)
+
+F.Intrinsic.Control.If(V.DataTable.dtUpdate.RowCount,=,0)
+	F.Intrinsic.String.Build("No Reorder Points were updated as{0}no parts reflected a change in usage",V.Ambient.NewLine,V.Local.sMsg)
+	F.Intrinsic.UI.Msgbox(V.Local.sMsg,"Note")
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+F.Data.DataTable.SaveToDB("dtUpdate","conts","INVENTORY_MSTR","PART*!*LOCATION",256,"PART@!@PART*!*LOCATION@!@LOCATION*!*NEW_REORDER_POINT@!@QTY_REORDER")
+
+F.ODBC.Connection!conts.Close
+
+F.Data.DataView.Close("dtInvUsage","dvUpdated")
+F.Data.DataTable.Close("dtInvUsage")
+
+F.Data.DataTable.RemoveColumn("dtUpdate","Div1")
+F.Data.DataTable.RemoveColumn("dtUpdate","Div2")
+F.Data.DataTable.RemoveColumn("dtUpdate","Div3")
+F.Data.DataTable.RemoveColumn("dtUpdate","CHANGED")
+
+F.Intrinsic.Control.CallSub(GridView)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.GridView.Start
+F.Intrinsic.Control.Try
+V.Local.sMonth1.Declare
+V.Local.sMonth2.Declare
+V.Local.sMonth3.Declare
+V.Local.sDate.Declare
+
+F.Intrinsic.String.Format(V.Ambient.Date,"MM",V.Local.sDate)
+
+F.Intrinsic.Control.SelectCase(V.Local.sDate)
+	F.Intrinsic.Control.Case("01")
+		V.Local.sMonth1.Set("December")
+		V.Local.sMonth2.Set("November")
+		V.Local.sMonth3.Set("October")		
+	F.Intrinsic.Control.Case("02")
+		V.Local.sMonth1.Set("January")
+		V.Local.sMonth2.Set("December")
+		V.Local.sMonth3.Set("November")
+	F.Intrinsic.Control.Case("03")
+		V.Local.sMonth1.Set("February")
+		V.Local.sMonth2.Set("January")
+		V.Local.sMonth3.Set("December")
+	F.Intrinsic.Control.Case("04")
+		V.Local.sMonth1.Set("March")
+		V.Local.sMonth2.Set("February")
+		V.Local.sMonth3.Set("January")		
+	F.Intrinsic.Control.Case("05")
+		V.Local.sMonth1.Set("April")
+		V.Local.sMonth2.Set("March")
+		V.Local.sMonth3.Set("February")
+	F.Intrinsic.Control.Case("06")
+		V.Local.sMonth1.Set("May")
+		V.Local.sMonth2.Set("April")
+		V.Local.sMonth3.Set("March")
+	F.Intrinsic.Control.Case("07")
+		V.Local.sMonth1.Set("June")
+		V.Local.sMonth2.Set("May")
+		V.Local.sMonth3.Set("April")
+	F.Intrinsic.Control.Case("08")
+		V.Local.sMonth1.Set("July")
+		V.Local.sMonth2.Set("June")
+		V.Local.sMonth3.Set("May")
+	F.Intrinsic.Control.Case("09")
+		V.Local.sMonth1.Set("August")
+		V.Local.sMonth2.Set("July")
+		V.Local.sMonth3.Set("June")
+	F.Intrinsic.Control.Case("10")
+		V.Local.sMonth1.Set("September")
+		V.Local.sMonth2.Set("August")
+		V.Local.sMonth3.Set("July")
+	F.Intrinsic.Control.Case("11")
+		V.Local.sMonth1.Set("October")
+		V.Local.sMonth2.Set("September")
+		V.Local.sMonth3.Set("August")
+	F.Intrinsic.Control.Case("12")
+		V.Local.sMonth1.Set("November")
+		V.Local.sMonth2.Set("October")
+		V.Local.sMonth3.Set("September")
+F.Intrinsic.Control.EndSelect
+
+Gui.fmMain.GsGcUpdated.AddGridviewFromDatatable("gvUpdated","dtUpdate")
+Gui.fmMain.GsGcUpdated.SetGridviewProperty("gvUpdated","Editable",False)
+Gui.fmMain.GsGcUpdated.SetGridviewProperty("gvUpdated","ReadOnly",True)
+Gui.fmMain.GsGcUpdated.SetGridviewProperty("gvUpdated","OptionsViewColumnAutoWidth",True)
+
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","PART","HeaderFontBold",True)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","LOCATION","HeaderFontBold",True)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","OLD_REORDER","HeaderFontBold",True)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","MONTH1","HeaderFontBold",True)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","MONTH2","HeaderFontBold",True)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","MONTH3","HeaderFontBold",True)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","DIVISOR","HeaderFontBold",True)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","3MONTHAVG","HeaderFontBold",True)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","NEW_REORDER_POINT","HeaderFontBold",True)
+
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","PART","Caption","Part")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","LOCATION","Caption","Loc")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","OLD_REORDER","Caption","Orig Reorder Pnt")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","MONTH1","Caption",V.Local.sMonth1)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","MONTH2","Caption",V.Local.sMonth2)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","MONTH3","Caption",V.Local.sMonth3)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","DIVISOR","Caption","Divisor")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","3MONTHAVG","Caption","3 Month Avg")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","NEW_REORDER_POINT","Caption","New Reorder Pnt")
+
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","PART","HeaderHAlignment","Center")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","LOCATION","HeaderHAlignment","Center")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","OLD_REORDER","HeaderHAlignment","Center")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","MONTH1","HeaderHAlignment","Center")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","MONTH2","HeaderHAlignment","Center")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","MONTH3","HeaderHAlignment","Center")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","DIVISOR","HeaderHAlignment","Center")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","3MONTHAVG","HeaderHAlignment","Center")
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","NEW_REORDER_POINT","HeaderHAlignment","Center")
+
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","PART","Width",100)
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","LOCATION","Width",50)
+
+Gui.fmMain.GsGcUpdated.SetColumnProperty("gvUpdated","NEW_REORDER_POINT","DisplayCustomNumeric","#.0000")
+
+Gui.fmMain.GsGcUpdated.MainView("gvUpdated")
+
+Gui.fmMain..Show
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.GridView.End
+
+Program.Sub.cmdExport_Click.Start
+F.Intrinsic.Control.Try
+V.Local.sPath.Declare
+V.Local.sMsg.Declare
+
+F.Intrinsic.UI.ShowSaveFileDialog("","xlsx|*.xlsx",V.Local.sPath)
+
+F.Intrinsic.Control.If(V.Local.sPath,=,"***CANCEL***")
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Split(V.Local.sPath,".",V.Local.sPath)
+
+F.Intrinsic.String.Build("{0}.xlsx",V.Local.sPath(0),V.Local.sPath)
+
+Gui.fmMain.GsGcUpdated.Export(V.Local.sPath.Trim,"xlsx")
+
+F.Intrinsic.String.Build("File saved to {0}",V.Local.sPath.Trim,V.Local.sMsg)
+
+F.Intrinsic.UI.Msgbox(V.Local.sMsg,"Success!")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdExport_Click.End
+
+Program.Sub.fmMain_UnLoad.Start
+F.Intrinsic.Control.End
+Program.Sub.fmMain_UnLoad.End
+
+Program.Sub.Error.Start
+V.Local.sError.Declare
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+
+F.Intrinsic.String.Build("-------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({5}-{6}){0}{7}{0}Project: {4}{0}{7}{0}Sub: {1}{0}Error: {2}, {3}", V.Ambient.NewLine, V.Args.SubRoutine, V.Args.eNumber, V.Args.eDescription,V.Caller.ScriptFile,V.Ambient.Date, V.Ambient.Time,V.Local.sSep,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError,"Error",V.Local.iRet)
+Program.Sub.Error.End
+
+Program.Sub.Comments.Start
+${$5$}$2.0.0.0$}$2
+${$6$}$tsmith$}$20210719073539079$}$xqPbj9atw05FglvzeFsZ9cqXP+qvG6tXV9Pfl2mwEkBGkAaFU7H9Z6sQjbAjFslZb9KEAakNrgE=
+Program.Sub.Comments.End
